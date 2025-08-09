@@ -1,11 +1,13 @@
+[Unit]
 Description=MQTT_greenhouse
 After=mosquitto.service
 
 [Service]
-Type=simple
-Restart=always
+User=<USER>
+Type=exec
+Restart=on-failure
 RestartSec=10
-ExecStart=/opt/mqttenv/bin/python3 gh_mttq_sub.py
+ExecStart=/opt/mqttenv/bin/python3 /opt/greenhouse/gh_mttq_sub.py
 
 [Install]
 WantedBy=multi-user.target
