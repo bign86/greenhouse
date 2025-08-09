@@ -21,9 +21,9 @@ MAX_ATTEMPTS = 12
 RECONNECT_DELAY = 5
 
 # Database variables
-DB_FILE = 'greenhouse.db'
+DB_FILE = '/opt/greenhouse/greenhouse.db'
 DB_TABLE_NAME = 'data'
-DB_CREATE_FILE = 'greenhouse.sql'
+DB_CREATE_FILE = '/opt/greenhouse/greenhouse.sql'
 DB_TABLE_EXISTS = f'''
     SELECT [name] FROM [sqlite_master]
     WHERE [type] = 'table' AND [name] = '{DB_TABLE_NAME}';
