@@ -22,20 +22,31 @@ Alternatively, use the `install_gh_mqtt.sh` script to generate the environment a
 
 ## Prepare the required files
 
-Create a folder somewhere in the system. Inside the new folder copy the `gh_mttq_sub.py` file and create a new database.
+Create a folder somewhere in the system, the script absolute paths are hardcoded with `/opt/greenhouse`. Inside the new folder copy the `gh_mttq_sub.py` and the SQL file, then create a new database.
 
 ```bash
 mkdir -p /opt/greenhouse
 cd /opt/greenhouse
-mv ~/gh_mttq_sub.py .
+mv ~/gh_mttq_sub.py ~/greenhouse.sql .
 sqlite3 greenhouse.db
 ```
 
+Make sure both the `greenhouse.db` file and the `greenhouse` folder are owned or have permissions for the user that will run the service.
 To create the table in the database use the query in `greenhouse.sql`.
 
 ## Create and start the service
 
-Copy the `mqtt_greenhouse.service` file in `/etc/systemd/system`. Enable and start the service
+Copy the `mqtt_greenhouse.service` file in `/etc/systemd/system`.
+
+```bash
+mkdir -p /opt/greenhouse
+cd /opt/greenhouse
+mv ~/gh_mttq_sub.py ~/greenhouse.sql .
+sqlite3 greenhouse.db
+```
+
+In the file search for `<USER>` and substitute with the user that will run the service.
+Enable and start the service
 
 ```bash
 sudo systemctl enable mqtt_greenhouse
