@@ -73,10 +73,11 @@ def on_message(client, userdata, msg):
 
     try:
         cursor = conn.cursor()
+        data_mapped = payload.split('|')
         data = [
             timestamp,
-            *map(float, payload.split('|')),
-            False, False
+            *map(float, data_mapped[:-1]),
+            bool(int(data_mapped[-1])), False
         ]
 
         # Insert message data into sqlite database
@@ -86,6 +87,8 @@ def on_message(client, userdata, msg):
     except sql.Error as e:
         print("MQTT client: failed to save message.", e)
 
+    except Exception as ex:
+        print("MQTT client: failed to save message.", ex)
 
 
 # On disconnect callback
