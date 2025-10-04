@@ -1,6 +1,9 @@
 /********************************************************************************
  * GREENHOUSE CODE
- * v. 0.1
+ * v. 0.2
+
+ * v0.1: sensors
+ * v0.2: heater
  *******************************************************************************/
 
 /********************************************************************************
@@ -19,6 +22,10 @@
 #define CONNECTION_TIMEOUT 50
 #define INTERVAL_MINS 5
 #define SECONDS 60
+#define RELAY_PIN 5
+#define MIN_TEMP 5
+#define MAX_TEMP 10
+#define MAX_HUMD 80
 
 // Network credentials
 const char* ssid     = "<SSID>";
@@ -77,6 +84,10 @@ void setup() {
     }
   }
 
+  // Set pinout for the relay
+  pinMode(RELAY_PIN, OUTPUT);
+
+
   // Start first sensor
   pcaselect(0);
   if ( ! sht45_0.begin(&DEV_I2C) ) {
@@ -129,13 +140,30 @@ void loop() {
   pcaselect(1);
   sht45_1.getEvent(&hum1, &tmp1);
 
+
+  /**
+   AUTOMATE
+  */
+  // If temp is low and heater is off, put it on
+  if (tmp1.temperature < MIN_TEMP & !is_heather_on) {
+    Serial.println("Temp LOW: ON!");
+    digitalWrite(RELAY_PIN, HIGH);
+    is_heather_on = true;
+  }
+  // If temp is high and heater is on, put it off
+  else if (tmp1.temperature > MAX_TEMP & is_heather_on) {
+    Serial.println("Temp HIGH: OFF!");
+    digitalWrite(RELAY_PIN, LOW);
+    is_heather_on = false;
+  }
+
   // Publish info
-  String msg = String(tmp0.temperature) + "|" + String(tmp1.temperature) + "|" + String(hum0.relative_humidity) + "|" + String(hum1.relative_humidity);
+  String msg = String(tmp0.temperature) + "|" + String(tmp1.temperature) + "|" + String(hum0.relative_humidity) + "|" + String(hum1.relative_humidity) + "|" + String(is_heather_on);
   client.publish(topic, msg.c_str());
 
   // Wait INTERVAL_MINS minutes before looping
   delay(INTERVAL_MINS*SECONDS*1000);
-
+  
 }
 
 
@@ -180,6 +208,7 @@ void wifi_connect() {
 
   // Keep trying to connect until expiration
   while( WiFi.status() != WL_CONNECTED ) {
+
     // If not connected after too much time, restart the board
     if ( timeout_counter >= CONNECTION_TIMEOUT ) {
       Serial.println("Can't establish WiFi connection");
@@ -198,6 +227,9 @@ void wifi_connected(WiFiEvent_t event, WiFiEventInfo_t info) {
 }
 
 void wifi_disconnected(WiFiEvent_t event, WiFiEventInfo_t info){
+  // Shut off the heater
+  digitalWrite(RELAY_PIN, LOW);
+
   Serial.println("\nDisconnected from WiFi access point. Reason: ");
   Serial.println(info.wifi_sta_disconnected.reason);
   Serial.println("Trying to Reconnect");
@@ -218,6 +250,9 @@ void wifi_got_IP(WiFiEvent_t event, WiFiEventInfo_t info){
 void mqtt_connect() {
   Serial.print("Connecting to MQTT Broker...");
 
+  // Shut off the heater
+  digitalWrite(RELAY_PIN, LOW);
+
   while ( ! client.connected() ) {
     // Attempt to connect
     if (client.connect(hostname, mqtt_username, mqtt_password)) {
@@ -228,7 +263,3 @@ void mqtt_connect() {
     }
   }
 }
-
-
-
-
