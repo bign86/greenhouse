@@ -77,7 +77,7 @@ def on_message(client, userdata, msg):
         data = [
             timestamp,
             *map(float, data_mapped[:-1]),
-            bool(int(data_mapped[-1])), False
+            False, bool(int(data_mapped[-1]))
         ]
 
         # Insert message data into sqlite database
