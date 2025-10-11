@@ -86,7 +86,8 @@ void setup() {
 
   // Set pinout for the relay
   pinMode(RELAY_PIN, OUTPUT);
-
+  digitalWrite(RELAY_PIN, LOW);
+  
 
   // Start first sensor
   pcaselect(0);
@@ -145,13 +146,13 @@ void loop() {
    AUTOMATE
   */
   // If temp is low and heater is off, put it on
-  if ((tmp1.temperature < MIN_TEMP) && (!is_heather_on)) {
+  if (tmp1.temperature < MIN_TEMP) {
     Serial.println("Temp LOW: ON!");
     digitalWrite(RELAY_PIN, HIGH);
     is_heather_on = true;
   }
   // If temp is high and heater is on, put it off
-  else if ((tmp1.temperature > MAX_TEMP) && (is_heather_on)) {
+  else if (tmp1.temperature > MAX_TEMP) {
     Serial.println("Temp HIGH: OFF!");
     digitalWrite(RELAY_PIN, LOW);
     is_heather_on = false;
