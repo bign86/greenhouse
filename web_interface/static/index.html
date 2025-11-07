@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Greenhouse</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/luxon@3.4.3/build/global/luxon.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1.3.1"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 2em; }
+        .controls { margin-bottom: 1em; }
+        canvas { max-width: 100%; }
+        .error { color: red; font-weight: bold; }
+        h1 { font-family:SpaceGrotesk-Light; line-height: 1.2; font-weight: 500; font-size: 54px; }
+        h2 { font-family:SpaceGrotesk-Light; line-height: 1.2; font-weight: 500; font-size: 34px; }
+    </style>
+</head>
+<body>
+    <h1>House of sukke</h1>
+    <div class="controls">
+        <label for="days">Show last
+            <input type="number" id="days" value="3" min="1" max="30" style="width: 3em;">
+            days
+        </label>
+        <button onclick="loadData()">Update</button>
+    </div>
+    <div id="error" class="error"></div>
+    <h2>Temperature</h2>
+    <canvas id="tempChart"></canvas>
+    <h2>Humidity</h2>
+    <canvas id="humChart"></canvas>
+
+    <script>
+        let tempChart, humChart;
+
+        async function loadData() {
+            const days = document.getElementById('days').value;
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = '';
+
+            try {
+                const base = window.location.origin;
+                const res = await fetch(`${base}/api/data?days=${days}`);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const db_data = await res.json();
+
+                const data = db_data[0].data;
+                const heater_data = db_data[0].heater;
+                if (!Array.isArray(data) || data.length === 0) {
+                    errorDiv.textContent = "No data received.";
+                    return;
+                }
+
+                // Ensure date is ISO 8601 string for Chart.js/luxon
+                function toISODate(d) {
+                    if (typeof d === 'string' && d.match(/^\d{4}-\d{2}-\d{2}T/)) return d;
+                    return new Date(d).toISOString();
+                }
+                const temp1 = data.map(d => ({ x: toISODate(d.date), y: d.temp1 }));
+                const temp2 = data.map(d => ({ x: toISODate(d.date), y: d.temp2 }));
+                const hum1 = data.map(d => ({ x: toISODate(d.date), y: d.hum1 }));
+                const hum2 = data.map(d => ({ x: toISODate(d.date), y: d.hum2 }));
+                const heater = heater_data.map(d => ({ x1: toISODate(d[0]), x2: toISODate(d[1])}))
+
+                updateCharts(temp1, temp2, hum1, hum2, heater);
+            } catch (err) {
+                console.error(err);
+                errorDiv.textContent = `Failed to load data: ${err.message}`;
+            }
+        }
+
+
+        function updateCharts(temp1, temp2, hum1, hum2, heater) {
+            const tempCtx = document.getElementById('tempChart');
+            const humCtx = document.getElementById('humChart');
+
+            const backgroundColorPlugin = {
+                id: 'backgroundColorPlugin',
+                // beforeDraw signature: (chart, args, options)
+                beforeDraw: (chart, args, pluginOptions) => {
+                    const ctx = chart.ctx;
+                    ctx.save();
+                    const fillStyle = (pluginOptions && pluginOptions.fillStyle) || 'rgba(200,20,20,0.2)';
+                    ctx.fillStyle = fillStyle;
+                    const intervals = (pluginOptions && pluginOptions.heater) || [];
+                    intervals.forEach(interval => {
+                        // Coerce to epoch / Date to ensure getPixelForValue can parse them
+                        const rawStart = interval && (interval.x1 ?? interval.start ?? interval[0]);
+                        const rawEnd = interval && (interval.x2 ?? interval.end ?? interval[1]);
+                        const startMs = (typeof rawStart === 'number') ? rawStart : Date.parse(rawStart);
+                        const endMs = (typeof rawEnd === 'number') ? rawEnd : Date.parse(rawEnd);
+                        if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) return;
+                        const xStart = chart.scales.x.getPixelForValue(new Date(startMs));
+                        const xEnd = chart.scales.x.getPixelForValue(new Date(endMs));
+                        ctx.fillRect(xStart, chart.chartArea.top, xEnd - xStart, chart.chartArea.height);
+                    });
+                    ctx.restore();
+                }
+            };
+
+            const timeScale = {
+                type: 'time',
+                time: { unit: 'hour', tooltipFormat: 'MMM d HH:mm' },
+                ticks: { autoSkip: true, maxTicksLimit: 10 },
+                adapters: {
+                    date: {
+                        // Use luxon for parsing if needed
+                    }
+                },
+                // Explicitly tell Chart.js to use x as the time axis
+                parsing: false
+            };
+
+            if (!tempChart) {
+                tempChart = new Chart(tempCtx, {
+                    type: 'line',
+                    data: {
+                        datasets: [
+                            { label: 'Out', data: temp1, borderColor: 'blue', fill: false, parsing: {xAxisKey: 'x', yAxisKey: 'y'} },
+                            { label: 'In', data: temp2, borderColor: 'orange', fill: false, parsing: {xAxisKey: 'x', yAxisKey: 'y'} }
+                        ]
+                    },
+                    options: { responsive: true, scales: { x: timeScale }, plugins: { backgroundColorPlugin: { heater } } },
+                    plugins: [backgroundColorPlugin]
+                });
+            } else {
+                tempChart.data.datasets[0].data = temp1;
+                tempChart.data.datasets[1].data = temp2;
+                // update heater intervals for existing chart before update
+                if (!tempChart.options) tempChart.options = {};
+                if (!tempChart.options.plugins) tempChart.options.plugins = {};
+                tempChart.options.plugins.backgroundColorPlugin = { heater };
+                tempChart.update();
+            }
+
+            if (!humChart) {
+                humChart = new Chart(humCtx, {
+                    type: 'line',
+                    data: {
+                        datasets: [
+                            { label: 'Out', data: hum1, borderColor: 'blue', fill: false, parsing: {xAxisKey: 'x', yAxisKey: 'y'} },
+                            { label: 'In', data: hum2, borderColor: 'orange', fill: false, parsing: {xAxisKey: 'x', yAxisKey: 'y'} }
+                        ]
+                    },
+                    options: { responsive: true, scales: { x: timeScale }, plugins: { backgroundColorPlugin: { heater } } },
+                    plugins: [backgroundColorPlugin]
+                });
+            } else {
+                humChart.data.datasets[0].data = hum1;
+                humChart.data.datasets[1].data = hum2;
+                if (!humChart.options) humChart.options = {};
+                if (!humChart.options.plugins) humChart.options.plugins = {};
+                humChart.options.plugins.backgroundColorPlugin = { heater };
+                humChart.update();
+            }
+        }
+
+        window.onload = loadData;
+    </script>
+</body>
+</html>

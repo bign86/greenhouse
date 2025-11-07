@@ -1,0 +1,12 @@
+[Unit]
+Description=Greenhouse Web Interface API
+After=network.target
+
+[Service]
+User=pi
+WorkingDirectory=/opt/greenhouse/web_interface
+ExecStart=/opt/nfpyvenv/bin/python3 /opt/greenhouse/web_interface/app.py
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
